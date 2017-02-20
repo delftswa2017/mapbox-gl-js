@@ -16,6 +16,7 @@ class BoxZoomHandler {
     constructor(map) {
         this._map = map;
         this._el = map.getCanvasContainer();
+        this._canvas=map.getCanvas();
         this._container = map.getContainer();
 
         util.bindAll([
@@ -84,21 +85,52 @@ class BoxZoomHandler {
         const p0 = this._startPos,
             p1 = DOM.mousePos(this._el, e);
 
-        if (!this._box) {
-            this._box = DOM.create('div', 'mapboxgl-boxzoom', this._container);
+        if (!this.box1) {
             this._container.classList.add('mapboxgl-crosshair');
             this._fireEvent('boxzoomstart', e);
+            this.box1 = DOM.create('div', 'mapboxgl-boxzoom', this._container);
+            this.box1.style.width = "10px"
+            this.box1.style.height = "10px"
+            this.box2 = DOM.create('div', 'mapboxgl-boxzoom', this._container);
+            this.box2.style.width = "30px"
+            this.box2.style.height = "30px"
+            this.box3 = DOM.create('div', 'mapboxgl-boxzoom', this._container);
+            this.box3.style.width = "40px"
+            this.box3.style.height = "40px"
+            this.box4 = DOM.create('div', 'mapboxgl-boxzoom', this._container);
+            this.box4.style.width = "20px"
+            this.box4.style.height = "20px"
         }
-
         const minX = Math.min(p0.x, p1.x),
             maxX = Math.max(p0.x, p1.x),
             minY = Math.min(p0.y, p1.y),
             maxY = Math.max(p0.y, p1.y);
 
-        DOM.setTransform(this._box, `translate(${minX}px,${minY}px)`);
+        var p0ll = this._map.unproject(p0),
+        p1ll = this._map.unproject(p1),
+        n = Math.max(p0ll.lat,p1ll.lat),
+        s = Math.min(p0ll.lat,p1ll.lat),
+        e = Math.max(p0ll.lng,p1ll.lng),
+        w = Math.min(p0ll.lng,p1ll.lng),
+        nw = this._map.project({lat:n,lng:w}),
+        se = this._map.project({lat:s,lng:e}),
+        sw = this._map.project({lat:s,lng:w}),
+        ne = this._map.project({lat:n,lng:e});
+        // TODO draw the box with webgl in this._canvas
+        DOM.setTransform(this.box1,`translate(${nw.x}px,${nw.y}px)`)
+        DOM.setTransform(this.box2,`translate(${se.x}px,${se.y}px)`)
+        DOM.setTransform(this.box3,`translate(${sw.x}px,${sw.y}px)`)
+        DOM.setTransform(this.box4,`translate(${ne.x}px,${ne.y}px)`)
+        console.log(`nw ${nw.y} ${nw.x}`);
+        console.log(`sw ${sw.y} ${sw.x}`);
+        console.log(`se ${se.y} ${se.x}`);
+        console.log(`ne ${ne.y} ${ne.x}`);
 
-        this._box.style.width = `${maxX - minX}px`;
-        this._box.style.height = `${maxY - minY}px`;
+
+
+        const rotz = this._map.transform.angle * 360/6.28,
+        rotx = this._map.transform._pitch * 360/6.28;
+
     }
 
     _onMouseUp(e) {
@@ -140,6 +172,12 @@ class BoxZoomHandler {
         if (this._box) {
             this._box.parentNode.removeChild(this._box);
             this._box = null;
+            this.box1.parentNode.removeChild(this.box1);
+            this.box2.parentNode.removeChild(this.box2);
+            this.box3.parentNode.removeChild(this.box3);
+            this.box4.parentNode.removeChild(this.box4);
+            // this.ccanvas.parentNode.removeChild(this.ccanvas);
+            // this.ccanvas = null;
         }
 
         DOM.enableDrag();
