@@ -239,12 +239,36 @@ class Transform {
     }
 
     /**
-     * Given a point on screen, return its lnglat
+     * Given a point on screen and viewport options, return its lnglat
      * @param {Point} p screen point
+     * @param {CameraOptions} v viewport
      * @returns {LngLat} lnglat location
      */
-    pointLocation(p) {
-        return this.coordinateLocation(this.pointCoordinate(p));
+    pointLocation(p, v) {
+        if (v == null) {
+            return this.coordinateLocation(this.pointCoordinate(p));
+        } else {
+            const originalViewport = {
+                center: this.center,
+                zoom: this.zoom,
+                bearing: this.bearing,
+                pitch: this.pitch
+            };
+
+            if ('center' in v) this.center = v.center;
+            if ('zoom' in v) this.zoom = v.zoom;
+            if ('bearing' in v) this.bearing = v.bearing;
+            if ('pitch' in v) this.pitch = v.pitch;
+
+            const location = this.coordinateLocation(this.pointCoordinate(p));
+
+            if ('center' in v) this.center = originalViewport.center;
+            if ('zoom' in v) this.zoom = originalViewport.zoom;
+            if ('bearing' in v) this.bearing = originalViewport.bearing;
+            if ('pitch' in v) this.pitch = originalViewport.pitch;
+
+            return location;
+        }
     }
 
     /**
