@@ -4,6 +4,14 @@ const DOM = require('../../util/dom');
 const LngLatBounds = require('../../geo/lng_lat_bounds');
 const util = require('../../util/util');
 const window = require('../../util/window');
+const shaders = require('../../render/shaders');
+const ProgramConfiguration = require('../../data/program_configuration');
+const browser = require('../../util/browser');
+const glmatrix = require('@mapbox/gl-matrix');
+
+const vec4 = glmatrix.vec4,
+mat4 = glmatrix.mat4,
+mat2 = glmatrix.mat2
 
 /**
  * The `BoxZoomHandler` allows the user to zoom the map to fit within a bounding box.
@@ -116,15 +124,73 @@ class BoxZoomHandler {
         se = this._map.project({lat:s,lng:e}),
         sw = this._map.project({lat:s,lng:w}),
         ne = this._map.project({lat:n,lng:e});
+        // ===============================================
         // TODO draw the box with webgl in this._canvas
+        var gl = this._canvas.getContext("experimental-webgl");
+        gl.viewport(0, 0, this._canvas.width, this._canvas.height);
+        // gl.clearColor(0, 0, 0, 1);
+        // gl.clear(gl.COLOR_BUFFER_BIT);
+
+        // const definition = shaders['fill'];
+        const definition = shaders.fill;
+        var configuration = new ProgramConfiguration();
+        configuration.addUniform('color',"u_color");
+        configuration.addUniform('opacity','u_opacity');
+        let definesSource = `#define MAPBOX_GL_JS\n#define DEVICE_PIXEL_RATIO ${browser.devicePixelRatio.toFixed(1)}\n`;
+        const fragmentSource = configuration.applyPragmas(definesSource + shaders.prelude.fragmentSource + definition.fragmentSource, 'fragment');
+        const vertexSource = configuration.applyPragmas(definesSource + shaders.prelude.vertexSource + definition.vertexSource, 'vertex');
+
+        var vs = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vs, vertexSource);
+        gl.compileShader(vs);
+
+
+        var fs = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fs, fragmentSource);
+        gl.compileShader(fs);
+        var program = gl.createProgram();
+        gl.attachShader(program, vs);
+        gl.attachShader(program, fs);
+        gl.linkProgram(program);
+        var aspect = this._canvas.width / this._canvas.height;
+        //
+        var vertices = new Float32Array([
+          2*ne.x/this._canvas.height-1,2*aspect*ne.y/this._canvas.height-1,
+          2*nw.x/this._canvas.height-1,2*aspect*nw.y/this._canvas.height-1,
+          2*se.x/this._canvas.height-1,2*aspect*se.y/this._canvas.height-1,
+          2*sw.x/this._canvas.height-1,2*aspect*sw.y/this._canvas.height-1
+        ]);
+
+        var vbuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, vbuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+        var itemSize = 2;
+        var numItems = vertices.length / itemSize;
+        gl.useProgram(program);
+
+        program.uColor = gl.getUniformLocation(program, "u_color");
+        gl.uniform4f(program.uColor, 0.0, 0.3, 0.0, 1.0);
+        program.uOpacity = gl.getUniformLocation(program, "u_opacity");
+        gl.uniform1f(program.uOpacity, 1);
+        program.uMatrix = gl.getUniformLocation(program, "u_matrix");
+        gl.uniformMatrix4fv(program.uMatrix, false, mat4.identity(new Float64Array(16)));
+
+
+        program.aVertexPosition = gl.getAttribLocation(program, "a_pos");
+        gl.enableVertexAttribArray(program.aVertexPosition);
+        gl.vertexAttribPointer(program.aVertexPosition, itemSize, gl.FLOAT, false, 0, 0);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, numItems);
+        // ===============================================
+
         DOM.setTransform(this.box1,`translate(${nw.x}px,${nw.y}px)`)
         DOM.setTransform(this.box2,`translate(${se.x}px,${se.y}px)`)
         DOM.setTransform(this.box3,`translate(${sw.x}px,${sw.y}px)`)
         DOM.setTransform(this.box4,`translate(${ne.x}px,${ne.y}px)`)
-        console.log(`nw ${nw.y} ${nw.x}`);
-        console.log(`sw ${sw.y} ${sw.x}`);
-        console.log(`se ${se.y} ${se.x}`);
-        console.log(`ne ${ne.y} ${ne.x}`);
+        // console.log(`nw ${nw.y} ${nw.x}`);
+        // console.log(`sw ${sw.y} ${sw.x}`);
+        // console.log(`se ${se.y} ${se.x}`);
+        // console.log(`ne ${ne.y} ${ne.x}`);
 
 
 
@@ -147,9 +213,9 @@ class BoxZoomHandler {
         if (p0.x === p1.x && p0.y === p1.y) {
             this._fireEvent('boxzoomcancel', e);
         } else {
-            this._map
-                .fitBounds(bounds, {linear: true})
-                .fire('boxzoomend', { originalEvent: e, boxZoomBounds: bounds });
+            // this._map
+            //     .fitBounds(bounds, {linear: true})
+            //     .fire('boxzoomend', { originalEvent: e, boxZoomBounds: bounds });
         }
     }
 
